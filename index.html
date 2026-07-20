@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang='es'>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>
+    <title>Barba Roja - Gestión Pro V5</title>
+    <script src='https://unpkg.com/react@18/umd/react.production.min.js'></script>
+    <script src='https://unpkg.com/react-dom@18/umd/react-dom.production.min.js'></script>
+    <script src='https://unpkg.com/@babel/standalone/babel.min.js'></script>
+    <script src='https://cdn.tailwindcss.com'></script>
+    <link href='https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap' rel='stylesheet'>
+    <style>
+        body { font-family: 'Poppins', sans-serif; background-color: #0f172a; color: white; -webkit-tap-highlight-color: transparent; }
+        .card { background: #1e293b; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        .btn-primary { background: #e11d48; color: white; padding: 10px 20px; border-radius: 8px; font-weight: 600; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 0.75rem; color: #94a3b8; }
+        .nav-item.active { color: #e11d48; }
+        .day-pill { min-width: 60px; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 12px; background: #1e293b; transition: all 0.2s; }
+        .day-pill.active { background: #e11d48; color: white; transform: scale(1.05); }
+        input, select { background: #334155; border: 1px solid #475569; border-radius: 8px; padding: 8px; color: white; }
+    </style>
+</head>
+<body>
+    <div id='root'></div>
+    <script type='text/babel'>
+        const { useState, useEffect } = React;
+
+        const App = () => {
+            const [tab, setTab] = useState('agenda');
+            const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+            const [clients, setClients] = useState([]);
+            const [appointments, setAppointments] = useState({});
+            const [prices, setPrices] = useState({
+                'Corte': 18000,
+                'Barba': 8000,
+                'Combo': 22000,
+                'Colores': 75000
+            });
+
+            // Cargar datos
+            useEffect(() => {
+                const savedClients = localStorage.getItem('br_clients');
+                const savedApps = localStorage.getItem('br_apps');
+                const savedPrices = localStorage.getItem('br_prices');
+                if (savedClients) setClients(JSON.parse(savedClients));
+                if (savedApps) setAppointments(JSON.parse(savedApps));
+                if (savedPrices) setPrices(JSON.parse(savedPrices));
+            }, []);
+
+            // Guardar datos
+            const saveToLocal = (key, data) => {
+                localStorage.setItem(key, JSON.stringify(data));
+            };
+
+            const addClient = (client) => {
+                const newClients = [...clients, { ...client, id: Date.now() }];
+                setClients(newClients);
+                saveToLocal('br_clients', newClients);
+            };
+
+            const deleteClient = (id) => {
+                if (confirm('¿Seguro querés eliminar este cliente?')) {
+                    const newClients = clients.filter(c => c.id !== id);
+                    setClients(newClients);
+                    saveToLocal('br_clients', newClients);
+                }
+            };
+
+            const setAppointment = (barber, time, clientName) => {
+                const dayKey = selectedDate;
+                const newApps = { ...appointments };
+                if (!newApps[dayKey]) newApps[dayKey] = {};
+                newApps[dayKey][`${barber}-${time}`] = clientName;
+                setAppointments(newApps);
+                saveToLocal('br_apps', newApps);
+            };
+
+            const updatePrice = (service, value) => {
+                const newPrices = { ...prices, [service]: parseInt(value) || 0 };
+                setPrices(newPrices);
+                saveToLocal('br_prices', newPrices);
+            };
+
+            const generateDates = () => {
+                const dates = [];
+                for (let i = 0; i < 14; i++) {
+                    const d = new Date();
+                    d.setDate(d.getDate() + i);
+                    dates.push({
+                        full: d.toISOString().split('T')[0],
+                        day: d.toLocaleDateString('es-AR', { weekday: 'short' }).toUpperCase().replace('.', ''),
+                        num: d.getDate()
+                    });
+                }
+                return dates;
+            };
+
+            const times = [
+                '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00',
+                '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00',
+                '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30'
+            ];
+
+            return (
+                <div className="flex flex-col h-screen max-w-md mx-auto relative overflow-hidden">
+                    {/* Header y Calendario */}
+                    {tab === 'agenda' && (
+                        <div className="p-4 bg-slate-900 shadow-xl z-10">
+                            <h1 className="text-xl font-bold mb-4 text-rose-500">Barba Roja Agenda</h1>
+                            <div className="flex overflow-x-auto gap-3 no-scrollbar pb-2">
+                                {generateDates().map(d => (
+                                    <button 
+                                        key={d.full}
+                                        onClick={() => setSelectedDate(d.full)}
+                                        className={`day-pill ${selectedDate === d.full ? 'active' : ''}`}
+                                    >
+                                        <span className="text-xs font-bold">{d.day}</span>
+                                        <span className="text-lg font-bold">{d.num}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Contenido Principal */}
+                    <div className="flex-1 overflow-y-auto p-4 pb-24">
+                        {tab === 'agenda' && (
+                            <div className="space-y-8">
+                                {['Gonzalo', 'Pablo'].map(barber => (
+                                    <div key={barber} className="space-y-3">
+                                        <h2 className="text-lg font-bold flex items-center gap-2 border-b border-slate-700 pb-2">
+                                            <span>✂️</span> Agenda {barber}
+                                        </h2>
+                                        <div className="grid gap-2">
+                                            {times.map(time => {
+                                                const currentVal = appointments[selectedDate]?.[`${barber}-${time}`] || '';
+                                                return (
+                                                    <div key={time} className="flex items-center gap-2 bg-slate-800 p-2 rounded-lg">
+                                                        <span className="text-xs font-mono text-slate-400 w-12">{time}</span>
+                                                        <select 
+                                                            className="flex-1 text-sm bg-slate-700 border-none h-9"
+                                                            value={currentVal}
+                                                            onChange={(e) => setAppointment(barber, time, e.target.value)}
+                                                        >
+                                                            <option value="">Disponible</option>
+                                                            {clients.map(c => (
+                                                                <option key={c.id} value={c.nombre}>{c.nombre}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {tab === 'clientes' && (
+                            <div className="space-y-6">
+                                <h2 className="text-2xl font-bold">Base de Clientes</h2>
+                                <form className="card p-4 space-y-3" onSubmit={(e) => {
+                                    e.preventDefault();
+                                    const form = e.target;
+                                    addClient({
+                                        nombre: form.nombre.value,
+                                        celu: form.celu.value,
+                                        ig: form.ig.value
+                                    });
+                                    form.reset();
+                                }}>
+                                    <input name="nombre" placeholder="Nombre completo" className="w-full" required />
+                                    <div className="flex gap-2">
+                                        <input name="celu" placeholder="WhatsApp" className="w-1/2" />
+                                        <input name="ig" placeholder="Instagram" className="w-1/2" />
+                                    </div>
+                                    <button className="btn-primary w-full">+ Agregar Cliente</button>
+                                </form>
+
+                                <div className="space-y-2">
+                                    {clients.map(c => (
+                                        <div key={c.id} className="card p-3 flex justify-between items-center">
+                                            <div>
+                                                <p className="font-bold">{c.nombre}</p>
+                                                <p className="text-xs text-slate-400">{c.celu} | @{c.ig}</p>
+                                            </div>
+                                            <button onClick={() => deleteClient(c.id)} className="text-rose-500 p-2">🗑️</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {tab === 'caja' && (
+                            <div className="space-y-6">
+                                <h2 className="text-2xl font-bold">Configuración de Precios</h2>
+                                <div className="card p-4 space-y-4">
+                                    {Object.entries(prices).map(([service, price]) => (
+                                        <div key={service} className="flex items-center justify-between gap-4">
+                                            <span className="font-medium">{service}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-slate-400">$</span>
+                                                <input 
+                                                    type="number" 
+                                                    value={price}
+                                                    onChange={(e) => updatePrice(service, e.target.value)}
+                                                    className="w-32 text-right font-bold"
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="text-xs text-slate-400 text-center">
+                                    * Los cambios se guardan automáticamente.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Nav Bar */}
+                    <nav className="fixed bottom-0 left-0 right-0 h-20 bg-slate-900 border-t border-slate-800 flex justify-around items-center px-4 max-w-md mx-auto">
+                        <button onClick={() => setTab('agenda')} className={`nav-item ${tab === 'agenda' ? 'active' : ''}`}>
+                            <span className="text-xl">📅</span><span>Agenda</span>
+                        </button>
+                        <button onClick={() => setTab('clientes')} className={`nav-item ${tab === 'clientes' ? 'active' : ''}`}>
+                            <span className="text-xl">👥</span><span>Clientes</span>
+                        </button>
+                        <button onClick={() => setTab('caja')} className={`nav-item ${tab === 'caja' ? 'active' : ''}`}>
+                            <span className="text-xl">💰</span><span>Precios</span>
+                        </button>
+                    </nav>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
